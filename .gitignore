@@ -15,4 +15,5 @@ terraform.tfstate.backup
 banner icon.png
 
 __pycache__/
-.env
+
+test_uploads/
