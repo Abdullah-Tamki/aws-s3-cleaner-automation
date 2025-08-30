@@ -39,6 +39,11 @@ def list_files(bucket_name):
         for obj in contents:
             print(f"- {obj['Key']} (LastModified: {obj['LastModified']})")
 
+
+# We have two ways to handle cleanup of old S3 objects:
+# 1. Terraform lifecycle rules (preferred for automation and reliability).
+# 2. Python function `cleanup_old_files()` (implemented below for demonstration).
+'''
 def cleanup_old_files(bucket_name, days_old):
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_old)
     response = s3_client.list_objects_v2(Bucket=bucket_name)
@@ -50,6 +55,7 @@ def cleanup_old_files(bucket_name, days_old):
                 print(f"Deleted {obj['Key']} (last modified: {last_modified})")
     else:
         print("No files found for cleanup")
+'''
 
 if __name__ == "__main__":
     bucket = get_bucket_name()
@@ -58,4 +64,4 @@ if __name__ == "__main__":
     print(f"Using bucket from Terraform: {bucket}")
     upload_files(bucket, folder)
     list_files(bucket)
-    cleanup_old_files(bucket, 3)
+    #cleanup_old_files(bucket, 3)
