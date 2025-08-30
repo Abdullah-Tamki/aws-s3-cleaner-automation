@@ -1,25 +1,26 @@
 import boto3
 import os
-from botocore.exceptions import ClientError
+import json
+import subprocess
 from datetime import datetime, timezone, timedelta
+from botocore.exceptions import ClientError
 
 s3_client = boto3.client('s3')
 
-def create_bucket(bucket_name):
+def get_bucket_name():
+    """Fetch the bucket name from Terraform output."""
     try:
-        s3_client.head_bucket(Bucket=bucket_name)
-        print(f"Bucket '{bucket_name}' already exists.")
-
-    except ClientError:
-        region = s3_client.meta.region_name
-        if region == "us-east-1":
-            s3_client.create_bucket(Bucket=bucket_name)
-        else:
-            s3_client.create_bucket(
-                Bucket=bucket_name,
-                CreateBucketConfiguration={'LocationConstraint': region}
-            )
-        print(f"Bucket '{bucket_name}' created ssuccessfully!")
+        result = subprocess.run(
+            ["terraform", "output", "-json"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        outputs = json.loads(result.stdout)
+        return outputs["s3_bucket_name"]["value"]
+    except Exception as e:
+        print("Error getting bucket name from Terraform outputs:", e)
+        exit(1)
 
 def upload_files(bucket_name, folder_path):
     for file_name in os.listdir(folder_path):
@@ -34,27 +35,27 @@ def list_files(bucket_name):
     if not contents:
         print("No files in the bucket.")
     else:
+        print("Files in bucket:")
         for obj in contents:
-            print(obj['Key'])
+            print(f"- {obj['Key']} (LastModified: {obj['LastModified']})")
 
 def cleanup_old_files(bucket_name, days_old):
-    cuttoff_date = datetime.now(timezone.utc) - timedelta(days=days_old)
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_old)
     response = s3_client.list_objects_v2(Bucket=bucket_name)
     if 'Contents' in response:
         for obj in response['Contents']:
             last_modified = obj['LastModified']
-            if last_modified < cuttoff_date:
+            if last_modified < cutoff_date:
                 s3_client.delete_object(Bucket=bucket_name, Key=obj['Key'])
                 print(f"Deleted {obj['Key']} (last modified: {last_modified})")
-    
     else:
         print("No files found for cleanup")
 
-
 if __name__ == "__main__":
-    bucket = "my-s3-cleaner-demo-bucket-2025"
+    bucket = get_bucket_name()
     folder = "test_uploads"
-    create_bucket(bucket)
+
+    print(f"Using bucket from Terraform: {bucket}")
     upload_files(bucket, folder)
     list_files(bucket)
     cleanup_old_files(bucket, 3)
